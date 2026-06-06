@@ -1,0 +1,880 @@
+-- ============================================
+-- AUTO FARM v2 — Upgraded GUI
+-- Tabbed layout: Teleport | Sell | E Spam | Stats | Misc
+-- RShift to toggle menu
+-- ============================================
+
+local player = game.Players.LocalPlayer
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local leaderstats = player:WaitForChild("leaderstats")
+local sizeStat = leaderstats:WaitForChild("Size")
+
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local sellLegsRemote = replicatedStorage:WaitForChild("Remotes"):WaitForChild("SellLegs")
+
+-- ============================================
+-- THEME CONSTANTS
+-- ============================================
+
+local C = {
+    BG_DEEP    = Color3.fromRGB(10,  10,  20),
+    BG_PANEL   = Color3.fromRGB(14,  14,  26),
+    BG_CARD    = Color3.fromRGB(19,  19,  31),
+    BG_INPUT   = Color3.fromRGB(11,  11,  24),
+    BORDER     = Color3.fromRGB(30,  30,  53),
+    ACCENT     = Color3.fromRGB(91,  95,  255),
+    ACCENT_DIM = Color3.fromRGB(26,  26,  53),
+    GREEN      = Color3.fromRGB(46,  204, 113),
+    GREEN_DIM  = Color3.fromRGB(15,  31,  20),
+    RED        = Color3.fromRGB(255, 60,  60),
+    RED_DIM    = Color3.fromRGB(31,  10,  10),
+    AMBER      = Color3.fromRGB(240, 165, 0),
+    TEXT_PRI   = Color3.fromRGB(220, 220, 255),
+    TEXT_SEC   = Color3.fromRGB(100, 100, 170),
+    TEXT_DIM   = Color3.fromRGB(51,  51,  90),
+    WHITE      = Color3.fromRGB(255, 255, 255),
+}
+
+-- ============================================
+-- UTILITY HELPERS
+-- ============================================
+
+local function newFrame(parent, size, pos, bg, trans, name)
+    local f = Instance.new("Frame")
+    f.Size = size
+    f.Position = pos or UDim2.new(0,0,0,0)
+    f.BackgroundColor3 = bg or C.BG_PANEL
+    f.BackgroundTransparency = trans or 0
+    f.BorderSizePixel = 0
+    if name then f.Name = name end
+    f.Parent = parent
+    return f
+end
+
+local function newLabel(parent, size, pos, text, color, fontSize, font, alignX)
+    local l = Instance.new("TextLabel")
+    l.Size = size
+    l.Position = pos or UDim2.new(0,0,0,0)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or C.TEXT_PRI
+    l.TextSize = fontSize or 11
+    l.Font = font or Enum.Font.Gotham
+    l.TextXAlignment = alignX or Enum.TextXAlignment.Center
+    l.BorderSizePixel = 0
+    l.Parent = parent
+    return l
+end
+
+local function newButton(parent, size, pos, text, bg, textColor, fontSize)
+    local b = Instance.new("TextButton")
+    b.Size = size
+    b.Position = pos or UDim2.new(0,0,0,0)
+    b.BackgroundColor3 = bg or C.ACCENT
+    b.Text = text
+    b.TextColor3 = textColor or C.WHITE
+    b.TextSize = fontSize or 11
+    b.Font = Enum.Font.GothamBold
+    b.BorderSizePixel = 0
+    b.AutoButtonColor = false
+    b.Parent = parent
+    -- Hover effect
+    b.MouseEnter:Connect(function()
+        b.BackgroundColor3 = Color3.new(
+            math.min(bg.R + 0.06, 1),
+            math.min(bg.G + 0.06, 1),
+            math.min(bg.B + 0.06, 1)
+        )
+    end)
+    b.MouseLeave:Connect(function() b.BackgroundColor3 = bg end)
+    return b
+end
+
+local function newBox(parent, size, pos, text)
+    local b = Instance.new("TextBox")
+    b.Size = size
+    b.Position = pos or UDim2.new(0,0,0,0)
+    b.BackgroundColor3 = C.BG_INPUT
+    b.BorderColor3 = C.BORDER
+    b.BorderSizePixel = 1
+    b.Text = text
+    b.TextColor3 = C.TEXT_PRI
+    b.TextSize = 11
+    b.Font = Enum.Font.Gotham
+    b.ClearTextOnFocus = false
+    b.Parent = parent
+    return b
+end
+
+local function addCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 8)
+    c.Parent = parent
+    return c
+end
+
+local function addStroke(parent, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color or C.BORDER
+    s.Thickness = thickness or 1
+    s.Parent = parent
+    return s
+end
+
+-- ============================================
+-- BUILD GUI
+-- ============================================
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "Dimasik_client"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main container
+local main = newFrame(screenGui,
+    UDim2.new(0, 340, 0, 470),
+    UDim2.new(0.5, -170, 0.5, -235),
+    C.BG_DEEP, 0, "Main")
+main.Active = true
+main.Draggable = true
+addCorner(main, 14)
+addStroke(main, C.BORDER, 1)
+
+-- ── TOP BAR ──────────────────────────────────
+local topBar = newFrame(main, UDim2.new(1,0,0,38), UDim2.new(0,0,0,0), C.BG_INPUT)
+addCorner(topBar, 14)
+
+-- Patch bottom corners flat
+local topBarPatch = newFrame(main, UDim2.new(1,0,0,14), UDim2.new(0,0,0,24), C.BG_INPUT)
+
+local dotFrame = newFrame(topBar, UDim2.new(0,8,0,8), UDim2.new(0,14,0.5,-4), C.ACCENT)
+addCorner(dotFrame, 4)
+
+local titleLbl = newLabel(topBar, UDim2.new(1,-90,1,0), UDim2.new(0,28,0,0),
+    "AUTO FARM", C.TEXT_PRI, 13, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+
+local rshiftBadge = newFrame(topBar, UDim2.new(0,56,0,20), UDim2.new(1,-84,0.5,-10), C.ACCENT_DIM)
+addCorner(rshiftBadge, 4)
+newLabel(rshiftBadge, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), "RSHIFT", C.ACCENT, 9, Enum.Font.GothamBold)
+
+local closeBtn = newButton(topBar, UDim2.new(0,22,0,22), UDim2.new(1,-30,0.5,-11),
+    "✕", C.RED_DIM, C.RED, 11)
+addCorner(closeBtn, 11)
+closeBtn.MouseButton1Click:Connect(function() main.Visible = false end)
+
+-- ── TAB BAR ──────────────────────────────────
+local TAB_NAMES = {"Teleport", "Sell", "E Spam", "Stats", "Misc"}
+local TAB_IDS   = {"tp", "sell", "spam", "stats", "misc"}
+local tabBar = newFrame(main, UDim2.new(1,0,0,32), UDim2.new(0,0,0,38), C.BG_INPUT)
+addStroke(tabBar, C.BORDER, 1)
+
+local tabButtons = {}
+local tabIndicator = newFrame(tabBar, UDim2.new(0.20,0,0,2), UDim2.new(0,0,1,-2), C.ACCENT)
+
+for i, name in ipairs(TAB_NAMES) do
+    local tb = newButton(tabBar,
+        UDim2.new(0.20,0,1,0),
+        UDim2.new((i-1)*0.20,0,0,0),
+        name, C.BG_INPUT, C.TEXT_DIM, 10)
+    tabButtons[i] = tb
+end
+
+-- ── PANELS ───────────────────────────────────
+local panelContainer = newFrame(main, UDim2.new(1,0,0,370), UDim2.new(0,0,0,70), C.BG_PANEL)
+
+-- Helper: create a panel (Fixed to 5 iterations for the 5 tabs)
+local panels = {}
+for i = 1, 5 do
+    local p = newFrame(panelContainer, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), C.BG_PANEL)
+    p.Visible = (i == 1)
+    p.Name = "Panel_"..TAB_IDS[i]
+    panels[i] = p
+end
+
+-- ── STATUS BAR ───────────────────────────────
+local statusBar = newFrame(main, UDim2.new(1,0,0,28), UDim2.new(0,0,1,-28), C.BG_INPUT)
+local statusDot = newFrame(statusBar, UDim2.new(0,7,0,7), UDim2.new(0,12,0.5,-3.5), C.GREEN)
+addCorner(statusDot, 3.5)
+local statusLbl = newLabel(statusBar, UDim2.new(1,-30,1,0), UDim2.new(0,25,0,0),
+    "Ready — press RShift to toggle menu", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+addCorner(statusBar, 0)
+
+local function setStatus(msg, color)
+    statusLbl.Text = msg
+    statusDot.BackgroundColor3 = color or C.GREEN
+end
+
+-- ────────────────────────────────────────────
+-- PANEL 1: TELEPORT
+-- ────────────────────────────────────────────
+local tp = panels[1]
+
+local targetCard = newFrame(tp, UDim2.new(1,-24,0,52), UDim2.new(0,12,0,10), C.BG_CARD)
+addCorner(targetCard, 8)
+addStroke(targetCard, C.BORDER)
+newLabel(targetCard, UDim2.new(1,0,0,16), UDim2.new(0,0,0,4),
+    "TARGET", C.TEXT_DIM, 9, Enum.Font.GothamBold)
+local targetNameLbl = newLabel(targetCard, UDim2.new(1,-12,0,18), UDim2.new(0,8,0,18),
+    "Scanning workspace...", C.ACCENT, 12, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local targetLengthLbl = newLabel(targetCard, UDim2.new(0,80,0,14), UDim2.new(1,-88,0,20),
+    "len: —", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Right)
+
+local tpProg = newFrame(tp, UDim2.new(0,0,0,3), UDim2.new(0,0,0,62), C.ACCENT)
+addCorner(tpProg, 1)
+newFrame(tp, UDim2.new(1,0,0,3), UDim2.new(0,0,0,62), C.BORDER)
+
+local manualTPBtn = newButton(tp, UDim2.new(0.48,-18,0,34), UDim2.new(0,12,0,74),
+    "Manual TP", C.ACCENT, C.WHITE, 11)
+addCorner(manualTPBtn, 7)
+
+local autoTPBtn = newButton(tp, UDim2.new(0.48,-6,0,34), UDim2.new(0.5,6,0,74),
+    "Auto: OFF", C.BG_CARD, C.TEXT_SEC, 11)
+addCorner(autoTPBtn, 7)
+addStroke(autoTPBtn, C.BORDER)
+
+local tpDiv = newFrame(tp, UDim2.new(1,-24,0,1), UDim2.new(0,12,0,118), C.BORDER)
+
+newLabel(tp, UDim2.new(1,0,0,14), UDim2.new(0,14,0,126),
+    "SETTINGS", C.TEXT_DIM, 8, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+
+newLabel(tp, UDim2.new(0,60,0,16), UDim2.new(0,14,0,148), "Interval", C.TEXT_SEC, 10, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local intervalBox = newBox(tp, UDim2.new(0,52,0,24), UDim2.new(0,78,0,144), "5")
+newLabel(tp, UDim2.new(0,24,0,16), UDim2.new(0,134,0,148), "sec", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+
+newLabel(tp, UDim2.new(0,60,0,16), UDim2.new(0,14,0,178), "Platform", C.TEXT_SEC, 10, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local platBadge = newFrame(tp, UDim2.new(0,104,0,20), UDim2.new(0,76,0,174), C.ACCENT_DIM)
+addCorner(platBadge, 4)
+newLabel(platBadge, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), "3 studs below (static)", C.ACCENT, 9, Enum.Font.Gotham)
+
+-- ────────────────────────────────────────────
+-- PANEL 2: SELL
+-- ────────────────────────────────────────────
+local sp = panels[2]
+
+local function statBox(parent, x, val, lbl, col)
+    local box = newFrame(parent, UDim2.new(0,90,0,50), UDim2.new(0,x,0,10), C.BG_CARD)
+    addCorner(box, 8)
+    addStroke(box, C.BORDER)
+    local vl = newLabel(box, UDim2.new(1,0,0,26), UDim2.new(0,0,0,8), val, col or C.ACCENT, 20, Enum.Font.GothamBold)
+    newLabel(box, UDim2.new(1,0,0,14), UDim2.new(0,0,0,32), lbl, C.TEXT_DIM, 8, Enum.Font.GothamBold)
+    return vl
+end
+
+local sizeValLbl  = statBox(sp, 12,  "0", "SIZE",   C.GREEN)
+local threshLbl   = statBox(sp, 114, "3", "THRESHOLD", C.AMBER)
+local sellsLbl    = statBox(sp, 216, "0", "TOTAL SELLS", C.ACCENT)
+
+newFrame(sp, UDim2.new(1,-24,0,5), UDim2.new(0,12,0,68), C.BORDER)
+local sizeProgFill = newFrame(sp, UDim2.new(0,0,0,5), UDim2.new(0,12,0,68), C.GREEN)
+addCorner(sizeProgFill, 2)
+
+local autoSellBtn = newButton(sp, UDim2.new(0.58,-18,0,34), UDim2.new(0,12,0,84),
+    "Auto sell: ON", C.GREEN_DIM, C.GREEN, 11)
+addCorner(autoSellBtn, 7)
+addStroke(autoSellBtn, C.GREEN)
+
+local manualSellBtn = newButton(sp, UDim2.new(0.38,-6,0,34), UDim2.new(0.62,6,0,84),
+    "Sell now", C.ACCENT, C.WHITE, 11)
+addCorner(manualSellBtn, 7)
+
+newFrame(sp, UDim2.new(1,-24,0,1), UDim2.new(0,12,0,128), C.BORDER)
+
+newLabel(sp, UDim2.new(1,0,0,14), UDim2.new(0,14,0,136),
+    "SETTINGS", C.TEXT_DIM, 8, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+
+newLabel(sp, UDim2.new(0,70,0,16), UDim2.new(0,14,0,158), "Sell at size", C.TEXT_SEC, 10, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local sellThreshBox = newBox(sp, UDim2.new(0,52,0,24), UDim2.new(0,88,0,154), "3")
+
+newLabel(sp, UDim2.new(0,70,0,16), UDim2.new(0,14,0,188), "Cooldown", C.TEXT_SEC, 10, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local cooldownBox = newBox(sp, UDim2.new(0,52,0,24), UDim2.new(0,88,0,184), "1")
+newLabel(sp, UDim2.new(0,24,0,16), UDim2.new(0,144,0,188), "sec", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+
+-- ────────────────────────────────────────────
+-- PANEL 3: E SPAM
+-- ────────────────────────────────────────────
+local ep = panels[3]
+
+local spamCard = newFrame(ep, UDim2.new(1,-24,0,56), UDim2.new(0,12,0,10), C.BG_CARD)
+addCorner(spamCard, 8)
+addStroke(spamCard, C.BORDER)
+newLabel(spamCard, UDim2.new(0.7,0,0,22), UDim2.new(0,10,0,6), "E Key Spammer", C.TEXT_PRI, 13, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+newLabel(spamCard, UDim2.new(0.9,0,0,18), UDim2.new(0,10,0,28), "VirtualInputManager", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local pingDot = newFrame(spamCard, UDim2.new(0,8,0,8), UDim2.new(1,-18,0.5,-4), C.TEXT_DIM)
+addCorner(pingDot, 4)
+
+local spamToggleBtn = newButton(ep, UDim2.new(1,-24,0,34), UDim2.new(0,12,0,76),
+    "Spam: OFF", C.RED_DIM, C.RED, 11)
+addCorner(spamToggleBtn, 7)
+addStroke(spamToggleBtn, C.RED)
+
+newFrame(ep, UDim2.new(1,-24,0,1), UDim2.new(0,12,0,120), C.BORDER)
+newLabel(ep, UDim2.new(1,0,0,14), UDim2.new(0,14,0,128), "RATE", C.TEXT_DIM, 8, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+
+newLabel(ep, UDim2.new(0,70,0,16), UDim2.new(0,14,0,150), "Interval", C.TEXT_SEC, 10, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+local spamRateBox = newBox(ep, UDim2.new(0,52,0,24), UDim2.new(0,88,0,146), "50")
+newLabel(ep, UDim2.new(0,24,0,16), UDim2.new(0,144,0,150), "ms", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+
+newFrame(ep, UDim2.new(1,-24,0,4), UDim2.new(0,12,0,182), C.BORDER)
+addCorner(newFrame(ep, UDim2.new(1,-24,0,4), UDim2.new(0,12,0,182), C.BORDER), 2)
+local spamRateBar = newFrame(ep, UDim2.new(0.1,0,0,4), UDim2.new(0,12,0,182), C.ACCENT)
+addCorner(spamRateBar, 2)
+newLabel(ep, UDim2.new(0.5,0,0,14), UDim2.new(0,12,0,190), "10ms (fast)", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+newLabel(ep, UDim2.new(0.5,0,0,14), UDim2.new(0.5,0,0,190), "500ms (slow)", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Right)
+
+-- ────────────────────────────────────────────
+-- PANEL 4: STATS
+-- ────────────────────────────────────────────
+local stp = panels[4]
+
+local function statMini(parent, x, y, val, lbl, col)
+    local box = newFrame(parent, UDim2.new(0,90,0,50), UDim2.new(0,x,0,y), C.BG_CARD)
+    addCorner(box, 8)
+    addStroke(box, C.BORDER)
+    local vl = newLabel(box, UDim2.new(1,0,0,26), UDim2.new(0,0,0,8), val, col or C.ACCENT, 20, Enum.Font.GothamBold)
+    newLabel(box, UDim2.new(1,0,0,14), UDim2.new(0,0,0,32), lbl, C.TEXT_DIM, 8, Enum.Font.GothamBold)
+    return vl
+end
+
+local stSells  = statMini(stp, 12,  10, "0",  "SELLS",     C.ACCENT)
+local stTPs    = statMini(stp, 114, 10, "0",  "TELEPORTS", C.GREEN)
+local stUptime = statMini(stp, 216, 10, "0s", "UPTIME",    C.AMBER)
+
+newFrame(stp, UDim2.new(1,-24,0,1), UDim2.new(0,12,0,70), C.BORDER)
+newLabel(stp, UDim2.new(1,0,0,14), UDim2.new(0,14,0,78), "ACTIVITY LOG", C.TEXT_DIM, 8, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+
+local logFrame = newFrame(stp, UDim2.new(1,-24,0,170), UDim2.new(0,12,0,94), C.BG_CARD)
+addCorner(logFrame, 8)
+addStroke(logFrame, C.BORDER)
+
+local logScroll = Instance.new("ScrollingFrame")
+logScroll.Size = UDim2.new(1,-8,1,-8)
+logScroll.Position = UDim2.new(0,4,0,4)
+logScroll.BackgroundTransparency = 1
+logScroll.BorderSizePixel = 0
+logScroll.ScrollBarThickness = 3
+logScroll.ScrollBarImageColor3 = C.BORDER
+logScroll.CanvasSize = UDim2.new(0,0,0,0)
+logScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+logScroll.Parent = logFrame
+
+local logLayout = Instance.new("UIListLayout")
+logLayout.SortOrder = Enum.SortOrder.LayoutOrder
+logLayout.Padding = UDim.new(0, 2)
+logLayout.Parent = logScroll
+
+local logCount = 0
+local function addLog(msg, color)
+    logCount = logCount + 1
+    local entry = newLabel(logScroll,
+        UDim2.new(1,0,0,14),
+        UDim2.new(0,0,0,0),
+        os.date("%H:%M:%S") .. "  " .. msg,
+        color or C.TEXT_SEC, 9, Enum.Font.Code, Enum.TextXAlignment.Left)
+    entry.LayoutOrder = logCount
+    task.wait()
+    logScroll.CanvasPosition = Vector2.new(0, math.huge)
+end
+
+local clearLogBtn = newButton(stp, UDim2.new(1,-24,0,26), UDim2.new(0,12,0,272),
+    "Clear log", C.BG_CARD, C.TEXT_SEC, 10)
+addCorner(clearLogBtn, 6)
+addStroke(clearLogBtn, C.BORDER)
+clearLogBtn.MouseButton1Click:Connect(function()
+    logScroll:ClearAllChildren()
+    local layout2 = Instance.new("UIListLayout")
+    layout2.SortOrder = Enum.SortOrder.LayoutOrder
+    layout2.Padding = UDim.new(0, 2)
+    layout2.Parent = logScroll
+    logCount = 0
+end)
+
+-- ────────────────────────────────────────────
+-- PANEL 5: MISC (GAMEPASSES)
+-- ────────────────────────────────────────────
+local mp = panels[5]
+
+local miscCard = newFrame(mp, UDim2.new(1,-24,0,56), UDim2.new(0,12,0,10), C.BG_CARD)
+addCorner(miscCard, 8)
+addStroke(miscCard, C.BORDER)
+newLabel(miscCard, UDim2.new(0.7,0,0,22), UDim2.new(0,10,0,6), "Gamepasses", C.TEXT_PRI, 13, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+newLabel(miscCard, UDim2.new(0.9,0,0,18), UDim2.new(0,10,0,28), "Block purchase prompts", C.TEXT_DIM, 9, Enum.Font.Gotham, Enum.TextXAlignment.Left)
+
+local gpToggleBtn = newButton(mp, UDim2.new(1,-24,0,34), UDim2.new(0,12,0,76),
+    "Disable Gamepasses: OFF", C.RED_DIM, C.RED, 11)
+addCorner(gpToggleBtn, 7)
+addStroke(gpToggleBtn, C.RED)
+
+-- ────────────────────────────────────────────
+-- TAB SWITCHING
+-- ────────────────────────────────────────────
+local activeTab = 1
+
+local function switchTab(index)
+    panels[activeTab].Visible = false
+    tabButtons[activeTab].BackgroundColor3 = C.BG_INPUT
+    tabButtons[activeTab].TextColor3 = C.TEXT_DIM
+
+    activeTab = index
+    panels[activeTab].Visible = true
+    tabButtons[activeTab].BackgroundColor3 = C.BG_INPUT
+    tabButtons[activeTab].TextColor3 = C.TEXT_PRI
+
+    -- Move indicator
+    tabIndicator.Position = UDim2.new((index-1)*0.20, 0, 1, -2)
+end
+
+for i, tb in ipairs(tabButtons) do
+    tb.MouseButton1Click:Connect(function() switchTab(i) end)
+end
+
+switchTab(1)
+
+-- ============================================
+-- RSHIFT BIND
+-- ============================================
+
+userInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        main.Visible = not main.Visible
+        setStatus(main.Visible and "Menu opened" or "Menu closed", main.Visible and C.GREEN or C.AMBER)
+    end
+end)
+
+-- ============================================
+-- STATE VARIABLES
+-- ============================================
+
+local autoTPActive  = false
+local autoTPCoro    = nil
+local tpInterval    = 5
+local currentIdx    = 1
+local validParts    = {}
+local currentPlat   = nil
+local isFrozen      = false
+local platSpawned   = false
+
+local autoSellActive = true
+local lastSellTime   = 0
+local sellCooldown   = 1
+local sellThreshold  = 3
+local totalSells     = 0
+local totalTPs       = 0
+
+local eSpamActive    = false
+local eSpamConn      = nil
+local eSpamRate      = 0.05
+
+local gamepassesDisabled = false -- MISC STATE
+
+local sessionStart   = tick()
+
+-- Uptime ticker
+task.spawn(function()
+    while true do
+        task.wait(1)
+        local secs = math.floor(tick() - sessionStart)
+        local m = math.floor(secs / 60)
+        local s = secs % 60
+        stUptime.Text = m > 0 and (m .. "m " .. s .. "s") or (s .. "s")
+    end
+end)
+
+-- ============================================
+-- PLATFORM FUNCTIONS
+-- ============================================
+
+local function getFootPos()
+    local char = player.Character
+    if not char then return nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local lf = char:FindFirstChild("LeftFoot")
+    local rf = char:FindFirstChild("RightFoot")
+    if lf and rf then
+        return Vector3.new(hrp.Position.X, math.min(lf.Position.Y, rf.Position.Y), hrp.Position.Z)
+    end
+    return Vector3.new(hrp.Position.X, hrp.Position.Y - 2.5, hrp.Position.Z)
+end
+
+local function buildPlatform(pos)
+    local p = Instance.new("Part")
+    p.Name     = "AutoFarmPlatform"
+    p.Size     = Vector3.new(6, 0.3, 6)
+    p.Position = pos
+    p.Anchored = true
+    p.CanCollide = true
+    p.Transparency = 0.25
+    p.BrickColor = BrickColor.new("Cyan")
+    p.Material = Enum.Material.Neon
+    p.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+    p.Parent = workspace
+    return p
+end
+
+local function spawnPlatform()
+    if currentPlat then pcall(function() currentPlat:Destroy() end) end
+    local fp = getFootPos()
+    if not fp then return end
+    currentPlat = buildPlatform(Vector3.new(fp.X, fp.Y - 3, fp.Z))
+    platSpawned = true
+    setStatus("Platform spawned 3 studs below", C.ACCENT)
+    addLog("Platform spawned", C.ACCENT)
+end
+
+local function removePlatform()
+    if currentPlat then pcall(function() currentPlat:Destroy() end) end
+    currentPlat = nil
+    platSpawned = false
+    setStatus("Platform removed", C.AMBER)
+    addLog("Platform removed", C.AMBER)
+end
+
+local function respawnPlatform()
+    if not platSpawned then return end
+    if currentPlat then pcall(function() currentPlat:Destroy() end) end
+    local fp = getFootPos()
+    if not fp then return end
+    currentPlat = buildPlatform(Vector3.new(fp.X, fp.Y - 3, fp.Z))
+end
+
+-- ============================================
+-- TELEPORT FUNCTIONS
+-- ============================================
+
+local function findParts()
+    local result = {}
+    for _, p in ipairs(workspace:GetDescendants()) do
+        if p:IsA("BasePart") then
+            local ok, len = pcall(function() return p:GetAttribute("Length") end)
+            if ok and type(len) == "number" and len > 150 then
+                table.insert(result, {part = p, length = len})
+            end
+        end
+    end
+    table.sort(result, function(a, b) return a.length > b.length end)
+    return result
+end
+
+local function refreshTargetUI()
+    validParts = findParts()
+    if #validParts == 0 then
+        targetNameLbl.Text  = "No parts found (Length > 150)"
+        targetLengthLbl.Text = "len: —"
+        targetNameLbl.TextColor3 = C.RED
+        return false
+    end
+    local best = validParts[1]
+    targetNameLbl.Text  = best.part.Name
+    targetLengthLbl.Text = "len: " .. best.length
+    targetNameLbl.TextColor3 = C.GREEN
+    tpProg.Size = UDim2.new(math.min(#validParts / 10, 1), 0, 0, 3)
+    return true
+end
+
+local function getNextTarget()
+    validParts = findParts()
+    if #validParts == 0 then return nil end
+    if currentIdx > #validParts then currentIdx = 1 end
+    local t = validParts[currentIdx]
+    currentIdx += 1
+    return t.part
+end
+
+local function doFreeze(dur)
+    isFrozen = true
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then
+            local ws, jp = hum.WalkSpeed, hum.JumpPower
+            hum.WalkSpeed = 0; hum.JumpPower = 0; hum.PlatformStand = true
+            task.wait(dur)
+            hum.WalkSpeed = ws; hum.JumpPower = jp; hum.PlatformStand = false
+        end
+    end
+    isFrozen = false
+end
+
+local function doTeleport()
+    if isFrozen then return false end
+    local target = getNextTarget()
+    if not target then setStatus("No valid target found", C.RED) return false end
+    local char = player.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+    totalTPs += 1
+
+    targetNameLbl.Text   = target.Name
+    targetLengthLbl.Text = "len: " .. (target:GetAttribute("Length") or "?")
+    stTPs.Text = tostring(totalTPs)
+    setStatus("Teleported to " .. target.Name, C.ACCENT)
+    addLog("TP → " .. target.Name, C.ACCENT)
+
+    task.wait(0.05)
+    respawnPlatform()
+    task.spawn(doFreeze, 0.1)
+    return true
+end
+
+local function startAutoTP()
+    if autoTPCoro then task.cancel(autoTPCoro) end
+    autoTPActive = true
+    autoTPBtn.BackgroundColor3 = C.ACCENT
+    autoTPBtn.TextColor3 = C.WHITE
+    autoTPBtn.Text = "Auto: ON"
+    setStatus("Auto teleport running (" .. tpInterval .. "s)", C.ACCENT)
+    spawnPlatform()
+    refreshTargetUI()
+    currentIdx = 1
+
+    autoTPCoro = task.spawn(function()
+        while autoTPActive do
+            task.wait(tpInterval)
+            if autoTPActive then doTeleport() end
+        end
+    end)
+end
+
+local function stopAutoTP()
+    autoTPActive = false
+    if autoTPCoro then task.cancel(autoTPCoro) end
+    autoTPBtn.BackgroundColor3 = C.BG_CARD
+    autoTPBtn.TextColor3 = C.TEXT_SEC
+    autoTPBtn.Text = "Auto: OFF"
+    setStatus("Auto teleport stopped", C.AMBER)
+    removePlatform()
+end
+
+-- ============================================
+-- SELL FUNCTIONS
+-- ============================================
+
+local function updateSizeUI()
+    local v = sizeStat.Value
+    sizeValLbl.Text = tostring(v)
+    threshLbl.Text  = tostring(sellThreshold)
+    local pct = math.clamp(v / sellThreshold, 0, 1)
+    sizeProgFill.Size = UDim2.new(pct, 0, 0, 5)
+    sizeValLbl.TextColor3 = (v >= sellThreshold) and C.GREEN or C.AMBER
+end
+
+local function doSell()
+    local now = tick()
+    if now - lastSellTime < sellCooldown then return false end
+    local v = sizeStat.Value
+    local ok = pcall(function() sellLegsRemote:FireServer() end)
+    if ok then
+        totalSells += 1
+        lastSellTime = now
+        sellsLbl.Text = tostring(totalSells)
+        stSells.Text  = tostring(totalSells)
+        setStatus("Sold! (" .. v .. " size → " .. totalSells .. " sells)", C.GREEN)
+        addLog("Sold at size " .. v, C.GREEN)
+        return true
+    end
+    return false
+end
+
+local function checkSell()
+    if autoSellActive and sizeStat.Value >= sellThreshold then
+        doSell()
+    end
+end
+
+-- ============================================
+-- E SPAM FUNCTIONS
+-- ============================================
+
+local function startESpam()
+    if eSpamConn then eSpamConn:Disconnect() end
+    eSpamActive = true
+    spamToggleBtn.BackgroundColor3 = C.GREEN_DIM
+    spamToggleBtn.TextColor3 = C.GREEN
+    spamToggleBtn.Text = "Spam: ON"
+    pingDot.BackgroundColor3 = C.GREEN
+
+    local last = tick()
+    eSpamConn = runService.Heartbeat:Connect(function()
+        if eSpamActive and (tick() - last) >= eSpamRate then
+            last = tick()
+            local vim = game:GetService("VirtualInputManager")
+            if vim then
+                vim:SendKeyEvent(true, "E", false, game)
+                task.wait()
+                vim:SendKeyEvent(false, "E", false, game)
+            end
+        end
+    end)
+    addLog("E spam started (" .. math.floor(eSpamRate*1000) .. "ms)", C.ACCENT)
+end
+
+local function stopESpam()
+    eSpamActive = false
+    if eSpamConn then eSpamConn:Disconnect() end
+    spamToggleBtn.BackgroundColor3 = C.RED_DIM
+    spamToggleBtn.TextColor3 = C.RED
+    spamToggleBtn.Text = "Spam: OFF"
+    pingDot.BackgroundColor3 = C.TEXT_DIM
+    addLog("E spam stopped", C.AMBER)
+end
+
+-- ============================================
+-- BUTTON CONNECTIONS
+-- ============================================
+
+manualTPBtn.MouseButton1Click:Connect(doTeleport)
+autoTPBtn.MouseButton1Click:Connect(function()
+    if autoTPActive then stopAutoTP() else startAutoTP() end
+end)
+
+autoSellBtn.MouseButton1Click:Connect(function()
+    autoSellActive = not autoSellActive
+    if autoSellActive then
+        autoSellBtn.BackgroundColor3 = C.GREEN_DIM
+        autoSellBtn.TextColor3 = C.GREEN
+        autoSellBtn.Text = "Auto sell: ON"
+        addLog("Auto sell ON", C.GREEN)
+        checkSell()
+    else
+        autoSellBtn.BackgroundColor3 = C.RED_DIM
+        autoSellBtn.TextColor3 = C.RED
+        autoSellBtn.Text = "Auto sell: OFF"
+        addLog("Auto sell OFF", C.AMBER)
+    end
+end)
+
+manualSellBtn.MouseButton1Click:Connect(doSell)
+spamToggleBtn.MouseButton1Click:Connect(function()
+    if eSpamActive then stopESpam() else startESpam() end
+end)
+
+-- MISC TAB TOGGLE (GAMEPASS BLOCKER)
+gpToggleBtn.MouseButton1Click:Connect(function()
+    gamepassesDisabled = not gamepassesDisabled
+    if gamepassesDisabled then
+        gpToggleBtn.BackgroundColor3 = C.GREEN_DIM
+        gpToggleBtn.TextColor3 = C.GREEN
+        gpToggleBtn.Text = "Disable Gamepasses: ON"
+        setStatus("Gamepass prompts blocked", C.GREEN)
+        addLog("Gamepass prompts blocked", C.GREEN)
+    else
+        gpToggleBtn.BackgroundColor3 = C.RED_DIM
+        gpToggleBtn.TextColor3 = C.RED
+        gpToggleBtn.Text = "Disable Gamepasses: OFF"
+        setStatus("Gamepass prompts allowed", C.AMBER)
+        addLog("Gamepass prompts allowed", C.AMBER)
+    end
+end)
+
+intervalBox.FocusLost:Connect(function()
+    local v = tonumber(intervalBox.Text)
+    if v and v >= 0.5 then
+        tpInterval = v
+        if autoTPActive then startAutoTP() end
+        setStatus("Interval set to " .. v .. "s", C.GREEN)
+    else
+        intervalBox.Text = tostring(tpInterval)
+    end
+end)
+
+sellThreshBox.FocusLost:Connect(function()
+    local v = tonumber(sellThreshBox.Text)
+    if v and v >= 1 then
+        sellThreshold = v
+        updateSizeUI()
+        setStatus("Sell threshold: " .. v, C.GREEN)
+    else
+        sellThreshBox.Text = tostring(sellThreshold)
+    end
+end)
+
+cooldownBox.FocusLost:Connect(function()
+    local v = tonumber(cooldownBox.Text)
+    if v and v >= 0.1 then
+        sellCooldown = v
+        setStatus("Cooldown: " .. v .. "s", C.GREEN)
+    else
+        cooldownBox.Text = tostring(sellCooldown)
+    end
+end)
+
+spamRateBox.FocusLost:Connect(function()
+    local v = tonumber(spamRateBox.Text)
+    if v and v >= 10 and v <= 500 then
+        eSpamRate = v / 1000
+        local pct = (v - 10) / (500 - 10)
+        spamRateBar.Size = UDim2.new(pct, 0, 0, 4)
+        if eSpamActive then startESpam() end
+        setStatus("E spam rate: " .. v .. "ms", C.GREEN)
+    else
+        spamRateBox.Text = tostring(eSpamRate * 1000)
+    end
+end)
+
+-- ============================================
+-- GAMEPASS HOOKMETAMETHOD
+-- ============================================
+pcall(function()
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        -- Если тумблер включен, блокируем спам всплывающими окнами от MarketplaceService
+        if gamepassesDisabled and tostring(self) == "MarketplaceService" then
+            if method == "PromptGamePassPurchase" or method == "PromptPurchase" then
+                return -- Перехват и отмена действия
+            end
+        end
+        return oldNamecall(self, ...)
+    end))
+end)
+
+-- ============================================
+-- EVENTS
+-- ============================================
+
+sizeStat:GetPropertyChangedSignal("Value"):Connect(function()
+    updateSizeUI()
+    checkSell()
+end)
+
+player.CharacterAdded:Connect(function(newChar)
+    character       = newChar
+    humanoid        = character:WaitForChild("Humanoid")
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    isFrozen        = false
+    addLog("Respawned", C.AMBER)
+
+    if autoTPActive and platSpawned then
+        task.wait(0.5)
+        removePlatform()
+        task.wait(0.1)
+        spawnPlatform()
+    end
+    setStatus("Respawned", C.AMBER)
+end)
+
+-- ============================================
+-- INIT
+-- ============================================
+
+updateSizeUI()
+refreshTargetUI()
+addLog("Auto Farm v2 loaded", C.GREEN)
+setStatus("Ready — press RShift to toggle menu", C.GREEN)
+
+print(string.rep("=", 45))
+print("  AUTO FARM v2 — Upgraded GUI Loaded")
+print("  RShift: toggle menu")
+print("  Tabs: Teleport | Sell | E Spam | Stats | Misc")
+print("  + Gamepass Blocker added!")
+print(string.rep("=", 45))
